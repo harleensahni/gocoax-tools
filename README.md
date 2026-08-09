@@ -197,6 +197,39 @@ Panels cover device health (`up` + last-good-read age), the PHY rate matrix,
 MoCA link/node state, Ethernet link/speed/error-rates, exporter scrape
 health, and a device inventory table.
 
+## Automatic remediation (optional)
+
+`gocoax-remediator` watches the exporter's metrics via Prometheus and **reboots
+adapters that are stuck** (unreachable, link-down, or chronic Ethernet drops),
+recording every reboot as its own metrics so the history shows in Grafana. Full
+design + tuning: [`docs/remediator.md`](docs/remediator.md).
+
+It's the third binary in the same image. Run it alongside the exporter — the
+`compose.yaml` has a `gocoax-remediator` service, or:
+
+```bash
+docker run -d --name gocoax-remediator --restart unless-stopped \
+  -p 9421:9421 \
+  -e GOCOAX_PW='your-device-password' \
+  -v "$PWD/config.toml:/etc/gocoax/config.toml:ro" \
+  --entrypoint /gocoax-remediator \
+  ghcr.io/harleensahni/gocoax-tools:latest
+```
+
+Configure it with the `[remediator]` block in `config.toml` (see
+`config.example.toml`) and scrape it from Prometheus:
+
+```yaml
+  - job_name: gocoax_remediator
+    static_configs:
+      - targets: ["<remediator-host>:9421"]
+```
+
+> **Safety:** it defaults to **`dry_run = true`** — it only logs "would reboot"
+> and increments `gocoax_remediator_would_reboot_total` until you explicitly set
+> `dry_run = false`. A per-device **cooldown** and daily **circuit breaker**
+> apply in both modes. Start in dry-run, watch what it *would* do, then enable.
+
 ## Metric catalog
 
 Common label: `device` (the config's `[[device]].name`). `gocoax_info` also

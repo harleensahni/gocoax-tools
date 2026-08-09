@@ -1,12 +1,12 @@
 # gocoax-tools — project memory
 
 Rust workspace for observing GoCoax MoCA adapters (MaxLinear MXL371x family)
-over their web management interface. **End goal** (multi-phase): detect MoCA
-link/PHY-rate issues → automatically reboot the adapter. This cycle built the
-observability half (library + Prometheus exporter + CLI + LAN discovery).
-**Reboot remediation (phase 3) is deliberately not built** — `reboot()`
-exists in the library and CLI, but nothing decides *when* to call it. See
-"Out of scope" below.
+over their web management interface, and **automatically rebooting stuck ones**.
+Three binaries: the `gocoax` CLI (status/reboot/discover), the
+`gocoax-exporter` Prometheus exporter, and `gocoax-remediator` (phase 3
+auto-reboot — polls Prometheus, reboots on sustained problems with a cooldown +
+circuit breaker, `dry_run`-first; see `docs/remediator.md`). All three ship in
+one container image.
 
 ## Workspace map
 
@@ -41,6 +41,14 @@ gocoax-tools/
       tests/
         metrics_render.rs           # render() text-format tests
         scrape_integration.rs       # scrape() against a mock device server incl. deadline expiry
+    gocoax-remediator/              # phase-3 auto-reboot daemon
+      src/
+        config.rs                  # [remediator] table: prometheus_url, cooldown, breaker, rules, dry_run(default true)
+        prom.rs                    # Prometheus instant-query client -> device labels
+        state.rs                   # cooldown + circuit-breaker state machine (pure, decide()/record_reboot())
+        poller.rs                  # poll_once(): query rules -> reboot (injectable Rebooter), safety gates
+        metrics.rs                 # remediator's own /metrics (reboots_total, circuit_open, ...)
+        main.rs                    # config load + poll loop + axum /metrics
 ```
 
 ## The device protocol (the crux)
@@ -167,8 +175,10 @@ headers or auth breaks completely.
 - **Metric naming**: `gocoax_*` prefix; counters end in `_total`
   (`gocoax_scrape_errors_total`, `gocoax_ethernet_{tx,rx}_frames_total`) and
   are monotonic so Grafana `rate()` works.
-- **`reboot()` lives in the library and CLI only** — the exporter is
-  deliberately read-only and never calls it (see spec §12 / out-of-scope).
+- **The exporter is read-only** and never reboots — only `gocoax-remediator`
+  (and the `gocoax reboot` CLI) call `Client::reboot()`. The remediator gates
+  every reboot behind a cooldown + daily circuit breaker and defaults to
+  `dry_run = true`.
 
 ## Conventions
 
@@ -191,15 +201,13 @@ headers or auth breaks completely.
 
 ## Out of scope / future
 
-- **Phase 3 — auto-remediation** (detect issue → reboot). Not built. Who
-  triggers the reboot is **explicitly undecided** — three options were
-  scoped in the design spec (§12) and left open: (A) Alertmanager webhook →
-  stateless remediator calling `gocoax::reboot()` (reuses Prometheus alerting
-  for hysteresis/dedup/cooldown), (B) a long-running self-deciding daemon
-  polling + evaluating thresholds in-process, (C) manual reboot via the CLI
-  after eyeballing Grafana. `reboot()` exists in the library/CLI now
-  specifically so any of these can be layered on later without touching the
-  protocol client.
+- **Phase 3 — auto-remediation: BUILT** as `gocoax-remediator` (option B, the
+  self-deciding daemon — it polls Prometheus, so the "sustained" hysteresis
+  lives in each rule's PromQL, no Alertmanager needed). Reboots on configurable
+  rules with a per-device cooldown + daily circuit breaker; `dry_run = true` by
+  default. See `docs/remediator.md`. Follow-ups noted there: in-memory state
+  resets on restart; `circuit_open` can stay stale if a device fully stops
+  matching any rule.
 - **Phase 4 — firmware upgrade.** The device's `upgrade.html` (bulk
   flashing) is **not mapped or implemented** — highest-risk, deferred,
   needs its own spec.

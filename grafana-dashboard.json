@@ -3,7 +3,11 @@
   "uid": "gocoax-moca",
   "title": "GoCoax MoCA",
   "description": "Health, PHY rates, MoCA/Ethernet link state, scrape health, and inventory for GoCoax MoCA adapters exported by gocoax-exporter.",
-  "tags": ["gocoax", "moca", "prometheus"],
+  "tags": [
+    "gocoax",
+    "moca",
+    "prometheus"
+  ],
   "style": "dark",
   "timezone": "browser",
   "editable": true,
@@ -11,12 +15,35 @@
   "schemaVersion": 39,
   "version": 1,
   "refresh": "30s",
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {},
   "fiscalYearStartMonth": 0,
   "liveNow": false,
   "links": [],
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "enable": true,
+        "hide": false,
+        "iconColor": "red",
+        "name": "Adapter reboots",
+        "target": {
+          "expr": "increase(gocoax_remediator_reboots_total[1m]) > 0",
+          "legendFormat": "{{device}} rebooted ({{reason}})",
+          "refId": "reboots"
+        },
+        "titleFormat": "Reboot: {{device}}",
+        "tags": []
+      }
+    ]
+  },
   "templating": {
     "list": [
       {
@@ -35,8 +62,14 @@
         "name": "device",
         "label": "Device",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": { "query": "label_values(gocoax_up, device)", "refId": "device-variable" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(gocoax_up, device)",
+          "refId": "device-variable"
+        },
         "definition": "label_values(gocoax_up, device)",
         "current": {},
         "hide": 0,
@@ -54,7 +87,12 @@
       "type": "row",
       "title": "Device Health",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "panels": []
     },
     {
@@ -62,19 +100,36 @@
       "type": "stat",
       "title": "Device Up",
       "description": "gocoax_up{device} -- 1 = the exporter successfully read this device on its last scrape, 0 = it did not. Distinct from Prometheus's own up{job=\"gocoax\"}, which only reflects the exporter process being reachable.",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_up{device=~\"$device\"}",
           "legendFormat": "{{device}}",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "orientation": "auto",
         "textMode": "auto",
         "colorMode": "background",
@@ -84,13 +139,29 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "DOWN" }, "1": { "text": "UP" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "UP"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           },
           "unit": "none"
@@ -103,19 +174,36 @@
       "type": "stat",
       "title": "Last Good Read Age (s)",
       "description": "time() - gocoax_last_success_timestamp_seconds{device} -- how long since the last fully successful scrape of this device.",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "time() - gocoax_last_success_timestamp_seconds{device=~\"$device\"}",
           "legendFormat": "{{device}}",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "orientation": "auto",
         "textMode": "auto",
         "colorMode": "value",
@@ -128,9 +216,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 60 },
-              { "color": "red", "value": 300 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
             ]
           }
         },
@@ -142,7 +239,12 @@
       "type": "row",
       "title": "PHY Rate Matrix",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
       "panels": []
     },
     {
@@ -150,34 +252,70 @@
       "type": "timeseries",
       "title": "PHY Rate (Mbps)",
       "description": "gocoax_phy_rate_mbps{type=\"nper\"} per node pair, plus gocoax_phy_rate_gcd_mbps per node as a secondary series.",
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_phy_rate_mbps{device=~\"$device\",type=\"nper\"}",
-          "legendFormat": "{{device}} {{from_node}}→{{to_node}}"
+          "legendFormat": "{{device}} {{from_node}}\u2192{{to_node}}"
         },
         {
           "refId": "B",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_phy_rate_gcd_mbps{device=~\"$device\"}",
           "legendFormat": "{{device}} node {{node}} (gcd)"
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "none", "custom": { "drawStyle": "line", "spanNulls": true } },
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "spanNulls": true
+          }
+        },
         "overrides": []
       },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi" } }
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 6,
       "type": "row",
       "title": "MoCA Link + Nodes",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
       "panels": []
     },
     {
@@ -185,19 +323,36 @@
       "type": "stat",
       "title": "MoCA Link Up",
       "description": "gocoax_moca_link_up{device}",
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 18 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_moca_link_up{device=~\"$device\"}",
           "legendFormat": "{{device}}",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "colorMode": "background",
         "graphMode": "none",
         "textMode": "auto",
@@ -206,13 +361,29 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "DOWN" }, "1": { "text": "UP" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "UP"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         },
@@ -224,46 +395,92 @@
       "type": "stat",
       "title": "MoCA Node Count",
       "description": "gocoax_moca_nodes{device}",
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 18 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_moca_nodes{device=~\"$device\"}",
           "legendFormat": "{{device}}",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "colorMode": "value",
         "graphMode": "none",
         "textMode": "auto",
         "justifyMode": "auto"
       },
-      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 9,
       "type": "table",
       "title": "Node MoCA Version",
       "description": "gocoax_node_moca_version{device,node} -- 25 = MoCA 2.5, 20 = MoCA 2.0.",
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 18 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_node_moca_version{device=~\"$device\"}",
           "format": "table",
           "instant": true
         }
       ],
-      "options": { "showHeader": true },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "transformations": [
-        { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true } } }
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            }
+          }
+        }
       ]
     },
     {
@@ -271,7 +488,12 @@
       "type": "row",
       "title": "Ethernet",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
       "panels": []
     },
     {
@@ -279,19 +501,36 @@
       "type": "stat",
       "title": "Ethernet Link Up",
       "description": "gocoax_ethernet_link_up{device,port}",
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 25 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 25
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_ethernet_link_up{device=~\"$device\"}",
           "legendFormat": "{{device}} port {{port}}",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "colorMode": "background",
         "graphMode": "none",
         "textMode": "auto",
@@ -300,13 +539,29 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "DOWN" }, "1": { "text": "UP" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "UP"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         },
@@ -318,68 +573,149 @@
       "type": "stat",
       "title": "Ethernet Speed (Mbps)",
       "description": "gocoax_ethernet_speed_mbps{device,port}",
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 25 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 25
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_ethernet_speed_mbps{device=~\"$device\"}",
           "legendFormat": "{{device}} port {{port}}",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "colorMode": "value",
         "graphMode": "none",
         "textMode": "auto",
         "justifyMode": "auto"
       },
-      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 13,
       "type": "timeseries",
       "title": "Ethernet RX Errors/Drops (5m rate)",
       "description": "rate(gocoax_ethernet_rx_frames_total{status=~\"bad|dropped\"}[5m])",
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 25 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 25
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "rate(gocoax_ethernet_rx_frames_total{device=~\"$device\",status=~\"bad|dropped\"}[5m])",
           "legendFormat": "{{device}} port {{port}} {{status}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "cps", "custom": { "drawStyle": "line" } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 14,
       "type": "timeseries",
       "title": "Ethernet TX Errors/Drops (5m rate)",
       "description": "rate(gocoax_ethernet_tx_frames_total{status=~\"bad|dropped\"}[5m])",
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 25 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 25
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "rate(gocoax_ethernet_tx_frames_total{device=~\"$device\",status=~\"bad|dropped\"}[5m])",
           "legendFormat": "{{device}} port {{port}} {{status}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "cps", "custom": { "drawStyle": "line" } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 15,
       "type": "row",
       "title": "Scrape Health",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
       "panels": []
     },
     {
@@ -387,43 +723,106 @@
       "type": "timeseries",
       "title": "Scrape Errors (1h increase) by reason",
       "description": "increase(gocoax_scrape_errors_total{device,reason}[1h]) -- reason = unreachable|timeout|auth|csrf|http_status|decode.",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "increase(gocoax_scrape_errors_total{device=~\"$device\"}[1h])",
           "legendFormat": "{{device}} {{reason}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "none", "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 17,
       "type": "timeseries",
       "title": "Scrape Duration (s)",
       "description": "gocoax_scrape_duration_seconds{device} -- per-device scrape time.",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_scrape_duration_seconds{device=~\"$device\"}",
           "legendFormat": "{{device}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line" } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 18,
       "type": "row",
       "title": "Device Inventory",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
       "panels": []
     },
     {
@@ -431,21 +830,46 @@
       "type": "table",
       "title": "Device Inventory",
       "description": "gocoax_info{device,host,mac,ip,soc_version,moca_version} -- always 1; a label carrier for device identity/firmware.",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 41 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "gocoax_info{device=~\"$device\"}",
           "format": "table",
           "instant": true
         }
       ],
-      "options": { "showHeader": true },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "transformations": [
-        { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "Value": true } } }
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "Value": true
+            }
+          }
+        }
       ]
     }
   ]

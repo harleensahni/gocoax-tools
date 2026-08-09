@@ -9,3 +9,27 @@ scrape_deadline_secs = 9
 [[device]]
 name = "moca-1"
 host = "192.0.2.250"
+
+# Optional: automatic reboot of stuck adapters (the gocoax-remediator binary).
+# Only needed if you run the remediator; the exporter ignores this table.
+[remediator]
+prometheus_url = "http://prometheus:9090"
+poll_interval_secs = 60
+cooldown_secs = 1800          # min seconds between reboots of one device
+max_reboots_per_day = 4       # circuit breaker per device
+listen = "0.0.0.0:9421"       # its own /metrics
+dry_run = true                # SAFE default: logs "would reboot" only.
+                              # set false for fully-automatic reboots.
+
+# Each rule's PromQL must return series carrying a `device` label; any device
+# returned is rebooted (subject to cooldown/breaker). The rule name becomes the
+# `reason` label. Edit thresholds to taste.
+[[remediator.rule]]
+name = "unreachable"
+expr = 'max_over_time(gocoax_up[10m]) == 0'
+[[remediator.rule]]
+name = "link_down"
+expr = 'max_over_time(gocoax_moca_link_up[10m]) == 0'
+[[remediator.rule]]
+name = "rx_drops"
+expr = 'avg_over_time(rate(gocoax_ethernet_rx_frames_total{status="dropped"}[5m])[15m:]) > 0.001'

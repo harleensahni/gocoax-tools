@@ -21,3 +21,20 @@ services:
     environment:
       # Only needed if config.toml uses `password_env = "GOCOAX_PW"`.
       - GOCOAX_PW=${GOCOAX_PW:-}
+
+  # Optional: automatic reboot of stuck adapters. Same image, remediator
+  # entrypoint. Reads the same config.toml (which needs a [remediator] block).
+  # Defaults to dry_run=true (logs "would reboot" only) until you set
+  # `dry_run = false` in config.toml. Reaches Prometheus at prometheus:9090.
+  gocoax-remediator:
+    image: ghcr.io/harleensahni/gocoax-tools:latest
+    # build: .
+    entrypoint: ["/gocoax-remediator"]
+    command: ["--config", "/etc/gocoax/config.toml"]
+    restart: unless-stopped
+    ports:
+      - "9421:9421"
+    volumes:
+      - ./config.toml:/etc/gocoax/config.toml:ro
+    environment:
+      - GOCOAX_PW=${GOCOAX_PW:-}

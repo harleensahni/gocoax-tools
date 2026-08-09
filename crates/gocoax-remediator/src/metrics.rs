@@ -15,6 +15,8 @@ pub struct MetricsSnapshot {
     pub reboots_total: Vec<(String, String, u64)>,
     /// (device, reason) -> count of reboots that `dry_run` suppressed.
     pub would_reboot_total: Vec<(String, String, u64)>,
+    /// (device, reason) -> count of reboot attempts that failed.
+    pub reboot_failures_total: Vec<(String, String, u64)>,
     /// device -> unix timestamp (seconds) of its last reboot.
     pub last_reboot_ts: Vec<(String, f64)>,
     /// device -> whether the circuit breaker is currently open.
@@ -71,6 +73,23 @@ pub fn render(snap: &MetricsSnapshot) -> String {
         }
     }
 
+    if !snap.reboot_failures_total.is_empty() {
+        let _ = writeln!(
+            out,
+            "# HELP gocoax_remediator_reboot_failures_total Count of reboot attempts that failed, by device and triggering rule."
+        );
+        let _ = writeln!(out, "# TYPE gocoax_remediator_reboot_failures_total counter");
+        for (device, reason, count) in &snap.reboot_failures_total {
+            let _ = writeln!(
+                out,
+                "gocoax_remediator_reboot_failures_total{{device=\"{}\",reason=\"{}\"}} {}",
+                esc(device),
+                esc(reason),
+                count
+            );
+        }
+    }
+
     if !snap.last_reboot_ts.is_empty() {
         let _ = writeln!(out, "# HELP gocoax_remediator_last_reboot_timestamp_seconds Unix timestamp of the device's last reboot performed by this daemon.");
         let _ = writeln!(out, "# TYPE gocoax_remediator_last_reboot_timestamp_seconds gauge");
@@ -110,6 +129,7 @@ mod tests {
         assert!(out.contains("gocoax_remediator_up 1"));
         assert!(!out.contains("gocoax_remediator_reboots_total{"));
         assert!(!out.contains("gocoax_remediator_would_reboot_total{"));
+        assert!(!out.contains("gocoax_remediator_reboot_failures_total{"));
         assert!(!out.contains("gocoax_remediator_last_reboot_timestamp_seconds{"));
         assert!(!out.contains("gocoax_remediator_circuit_open{"));
     }
@@ -119,6 +139,7 @@ mod tests {
         let snap = MetricsSnapshot {
             reboots_total: vec![("ff".to_string(), "unreachable".to_string(), 1)],
             would_reboot_total: vec![],
+            reboot_failures_total: vec![],
             last_reboot_ts: vec![("ff".to_string(), 1_700_000_000.0)],
             circuit_open: vec![("ff".to_string(), false)],
         };
@@ -128,6 +149,7 @@ mod tests {
         assert!(out.contains("gocoax_remediator_last_reboot_timestamp_seconds{device=\"ff\"} 1700000000"));
         assert!(out.contains("gocoax_remediator_circuit_open{device=\"ff\"} 0"));
         assert!(!out.contains("gocoax_remediator_would_reboot_total{"));
+        assert!(!out.contains("gocoax_remediator_reboot_failures_total{"));
     }
 
     #[test]
@@ -135,12 +157,31 @@ mod tests {
         let snap = MetricsSnapshot {
             reboots_total: vec![],
             would_reboot_total: vec![("gg".to_string(), "link_down".to_string(), 3)],
+            reboot_failures_total: vec![],
             last_reboot_ts: vec![],
             circuit_open: vec![("gg".to_string(), true)],
         };
         let out = render(&snap);
         assert!(out.contains("gocoax_remediator_would_reboot_total{device=\"gg\",reason=\"link_down\"} 3"));
         assert!(out.contains("gocoax_remediator_circuit_open{device=\"gg\"} 1"));
+        assert!(!out.contains("gocoax_remediator_reboots_total{"));
+    }
+
+    #[test]
+    fn reboot_failure_renders_and_does_not_touch_last_reboot_timestamp() {
+        // A failed reboot attempt bumps reboot_failures_total but must NOT
+        // advance the exposed last_reboot_timestamp_seconds metric (that
+        // only reflects successful reboots -- see poller.rs).
+        let snap = MetricsSnapshot {
+            reboots_total: vec![],
+            would_reboot_total: vec![],
+            reboot_failures_total: vec![("hh".to_string(), "unreachable".to_string(), 2)],
+            last_reboot_ts: vec![],
+            circuit_open: vec![("hh".to_string(), false)],
+        };
+        let out = render(&snap);
+        assert!(out.contains("gocoax_remediator_reboot_failures_total{device=\"hh\",reason=\"unreachable\"} 2"));
+        assert!(!out.contains("gocoax_remediator_last_reboot_timestamp_seconds{device=\"hh\"}"));
         assert!(!out.contains("gocoax_remediator_reboots_total{"));
     }
 }

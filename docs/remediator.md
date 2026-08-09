@@ -43,16 +43,26 @@ Any rule can be edited/added/removed in config. The rule `name` becomes the
   so a human gets alerted instead of an infinite loop.
 - **`dry_run`**: when true, it logs "would reboot" and increments
   `gocoax_remediator_would_reboot_total` **without actually rebooting**.
-  Recommended for the first run to see what it would do. Set `false` for
-  fully-automatic operation.
+  **Defaults to `true`** (fails closed) — omitting the key from config never
+  silently enables live reboots; a user must explicitly set `dry_run = false`
+  to enable fully-automatic operation. The cooldown and daily circuit breaker
+  apply identically whether `dry_run` is true or false, so the dry-run
+  preview reflects the same cadence live mode would produce.
+- **Failed reboot attempts still consume cooldown/breaker budget**: an
+  attempt (live, not dry-run) that fails is recorded the same as a
+  successful one for cooldown/breaker purposes — so a device that's
+  actually unreachable doesn't get hammered with a reboot POST every poll.
+  The failure itself is reported via `gocoax_remediator_reboot_failures_total`
+  rather than `gocoax_remediator_reboots_total`.
 
 ## Metrics it exposes (→ Prometheus → Grafana history)
 
 ```
 gocoax_remediator_up                                     1 = daemon healthy
-gocoax_remediator_reboots_total{device,reason}           counter of reboots performed
+gocoax_remediator_reboots_total{device,reason}           counter of reboots performed successfully
 gocoax_remediator_would_reboot_total{device,reason}      counter of reboots suppressed by dry_run
-gocoax_remediator_last_reboot_timestamp_seconds{device}  unix ts of last reboot
+gocoax_remediator_reboot_failures_total{device,reason}   counter of reboot attempts that failed
+gocoax_remediator_last_reboot_timestamp_seconds{device}  unix ts of last *successful* reboot
 gocoax_remediator_circuit_open{device}                   1 = breaker tripped, no longer rebooting
 ```
 

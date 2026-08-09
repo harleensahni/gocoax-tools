@@ -23,6 +23,12 @@ fn d_maxday() -> u32 {
 fn d_listen() -> String {
     "0.0.0.0:9421".into()
 }
+/// `dry_run` must fail CLOSED: if the key is omitted from config, the
+/// daemon must NOT perform live reboots. A user has to opt in explicitly
+/// with `dry_run = false`.
+fn d_dry_run() -> bool {
+    true
+}
 
 /// One trigger rule: a PromQL expression whose result vector's `device`
 /// labels name adapters considered problematic. `name` becomes the `reason`
@@ -44,7 +50,7 @@ pub struct RemediatorConfig {
     pub max_reboots_per_day: u32,
     #[serde(default = "d_listen")]
     pub listen: String,
-    #[serde(default)]
+    #[serde(default = "d_dry_run")]
     pub dry_run: bool,
     /// Trigger rules; may be empty (the daemon just polls nothing and
     /// exposes /metrics).
@@ -106,7 +112,9 @@ expr = "max_over_time(gocoax_up[10m]) == 0"
         assert_eq!(rcfg.cooldown_secs, 1800);
         assert_eq!(rcfg.max_reboots_per_day, 4);
         assert_eq!(rcfg.listen, "0.0.0.0:9421");
-        assert!(!rcfg.dry_run);
+        // dry_run must default to true (fail closed): omitting the key
+        // must never silently enable live reboots.
+        assert!(rcfg.dry_run);
         assert_eq!(rcfg.rule.len(), 1);
         assert_eq!(rcfg.rule[0].name, "unreachable");
     }
@@ -136,5 +144,23 @@ dry_run = true
         assert_eq!(rcfg.listen, "127.0.0.1:9421");
         assert!(rcfg.dry_run);
         assert!(rcfg.rule.is_empty());
+    }
+
+    #[test]
+    fn dry_run_must_be_explicitly_disabled_to_enable_live_reboots() {
+        let toml = r#"
+username = "admin"
+password = "g"
+
+[remediator]
+prometheus_url = "http://prometheus:9090"
+dry_run = false
+"#;
+        let dir = std::env::temp_dir().join(format!("gocoax-remediator-test3-{}", std::process::id()));
+        std::fs::write(&dir, toml).unwrap();
+        let (_cfg, rcfg) = load(dir.to_str().unwrap()).unwrap();
+        std::fs::remove_file(&dir).ok();
+
+        assert!(!rcfg.dry_run);
     }
 }

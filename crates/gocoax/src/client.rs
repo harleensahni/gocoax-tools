@@ -28,12 +28,15 @@ const ZERO_ARG_BODY: &str = r#"{"data":[0]}"#;
 pub struct ClientOpts {
     pub request_timeout: Duration,
     pub connect_timeout: Duration,
+    /// When true, log each HTTP request and its outcome to stderr.
+    pub verbose: bool,
 }
 
 pub struct Client {
     http: reqwest::Client,
     base_url: String,
     creds: ResolvedCreds,
+    verbose: bool,
     // Cached csrf token, shared across calls for this Client's lifetime.
     // A token is reusable indefinitely; we only refetch it on a 403.
     csrf: RwLock<Option<String>>,
@@ -61,7 +64,20 @@ impl Client {
             .http1_title_case_headers()
             .build()
             .map_err(|e: reqwest::Error| Error::Http(e.to_string()))?;
-        Ok(Client { http, base_url: format!("http://{host}"), creds, csrf: RwLock::new(None) })
+        Ok(Client {
+            http,
+            base_url: format!("http://{host}"),
+            creds,
+            verbose: opts.verbose,
+            csrf: RwLock::new(None),
+        })
+    }
+
+    /// Log a line to stderr when verbose mode is on.
+    fn log(&self, args: std::fmt::Arguments) {
+        if self.verbose {
+            eprintln!("[gocoax] {} {args}", self.base_url);
+        }
     }
 
     /// Ensure a csrf token is cached, returning it. Fetches one via GET
@@ -79,6 +95,7 @@ impl Client {
 
     async fn fetch_csrf(&self) -> Result<String> {
         let url = format!("{}/index.html", self.base_url);
+        self.log(format_args!("GET /index.html (fetch csrf)"));
         let resp = self
             .http
             .get(&url)
@@ -87,6 +104,7 @@ impl Client {
             .await
             .map_err(map_reqwest_err)?;
         let status = resp.status();
+        self.log(format_args!("GET /index.html -> {}", status.as_u16()));
         if !status.is_success() {
             return Err(status_to_error(status.as_u16()));
         }
@@ -102,7 +120,9 @@ impl Client {
 
     async fn post_once(&self, cmd: MsCmd, body: &str, token: &str) -> Result<reqwest::Response> {
         let url = format!("{}{}", self.base_url, cmd.path());
-        self.http
+        self.log(format_args!("POST {} {body}", cmd.path()));
+        let resp = self
+            .http
             .post(&url)
             .basic_auth(&self.creds.username, Some(&self.creds.password))
             .header("Content-Type", "application/x-www-form-urlencoded")
@@ -111,7 +131,9 @@ impl Client {
             .body(body.to_string())
             .send()
             .await
-            .map_err(map_reqwest_err)
+            .map_err(map_reqwest_err)?;
+        self.log(format_args!("POST {} -> {}", cmd.path(), resp.status().as_u16()));
+        Ok(resp)
     }
 
     /// Read one `ms` register: POST `cmd.path()` with `body`, attaching the
@@ -220,11 +242,72 @@ impl Client {
         decode_net_nodes(&local, |id| nets.get(&id).cloned().unwrap_or_default())
     }
 
-    /// Trigger a device reboot. The response body is not meaningful; only
-    /// success/failure of the request is reported.
+    /// Trigger a device reboot (fire-and-forget).
+    ///
+    /// The adapter power-cycles the instant it receives `0xb00` and drops the
+    /// connection without sending an HTTP response — its own web UI fires this
+    /// POST with empty callbacks and just reloads after 10s. So a **timeout or
+    /// dropped connection after the request was sent means the reboot took
+    /// effect** and is reported as success. Only a genuine failure to reach the
+    /// device (connect error) or an auth rejection (401) is an error.
     pub async fn reboot(&self) -> Result<()> {
-        self.read(ms::REBOOT, EMPTY_BODY).await?;
-        Ok(())
+        let token = self.ensure_csrf().await?;
+        match self.reboot_post_once(&token).await? {
+            None => Ok(()),
+            // Stale csrf token — refetch once and retry.
+            Some(403) => {
+                self.clear_csrf().await;
+                let token = self.ensure_csrf().await?;
+                match self.reboot_post_once(&token).await? {
+                    None => Ok(()),
+                    Some(code) => Err(status_to_error(code)),
+                }
+            }
+            Some(code) => Err(status_to_error(code)),
+        }
+    }
+
+    /// Send the reboot POST once. `Ok(None)` = the device accepted it (a 2xx, or
+    /// a timeout / dropped connection mid-response, which is how a real reboot
+    /// manifests). `Ok(Some(code))` = a non-2xx reply (e.g. 401/403). `Err` =
+    /// we never reached the device (connect failure), so it did not reboot.
+    async fn reboot_post_once(&self, token: &str) -> Result<Option<u16>> {
+        let url = format!("{}{}", self.base_url, ms::REBOOT.path());
+        self.log(format_args!("POST {} (reboot)", ms::REBOOT.path()));
+        let res = self
+            .http
+            .post(&url)
+            .basic_auth(&self.creds.username, Some(&self.creds.password))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .header("X-CSRF-TOKEN", token)
+            .header("Cookie", format!("csrf_token={token}"))
+            .body(EMPTY_BODY.to_string())
+            .send()
+            .await;
+        match res {
+            Ok(resp) => {
+                let code = resp.status().as_u16();
+                self.log(format_args!("POST {} -> {code}", ms::REBOOT.path()));
+                if (200..300).contains(&code) {
+                    Ok(None)
+                } else {
+                    Ok(Some(code))
+                }
+            }
+            // Never established a connection → the reboot was not sent.
+            Err(e) if e.is_connect() => {
+                self.log(format_args!("reboot connect failed: {e}"));
+                Err(Error::Http(e.to_string()))
+            }
+            // Connected and sent, then timed out / connection dropped → the
+            // device rebooted before it could reply. Treat as success.
+            Err(e) => {
+                self.log(format_args!(
+                    "reboot: no response after send ({e}) — device rebooted, treating as success"
+                ));
+                Ok(None)
+            }
+        }
     }
 }
 

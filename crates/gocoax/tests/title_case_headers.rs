@@ -40,6 +40,7 @@ async fn client_sends_title_case_authorization_header() {
         ClientOpts {
             request_timeout: Duration::from_secs(2),
             connect_timeout: Duration::from_secs(1),
+            verbose: false,
         },
     )
     .unwrap();

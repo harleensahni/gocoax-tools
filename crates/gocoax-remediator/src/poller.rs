@@ -43,6 +43,7 @@ impl Rebooter for RealRebooter {
         let opts = ClientOpts {
             request_timeout: Duration::from_secs(cfg.request_timeout_secs),
             connect_timeout: Duration::from_secs(cfg.connect_timeout_secs),
+            verbose: false,
         };
         let client = Client::new(&dev.host, creds, opts)?;
         client.reboot().await

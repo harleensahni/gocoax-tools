@@ -56,8 +56,17 @@ Read:    POST /ms/<space>/<hexcmd>[/GET]
                     Cookie: csrf_token=<token>
            body:    {"data":[...]}          (register args, often empty/[0])
            → 200    {"data":["0x..","0x..",...]}   (array of u32 words, hex strings)
-Reboot:  POST /ms/1/0xb00
+Reboot:  POST /ms/1/0xb00   (FIRE-AND-FORGET — see below)
 ```
+
+**Reboot is fire-and-forget.** The adapter power-cycles the instant it receives
+`0xb00` and drops the connection **without sending an HTTP response** (its own
+web UI fires the POST with empty callbacks and reloads after 10s). So
+`Client::reboot()` treats a **timeout / dropped connection after the request was
+sent as SUCCESS** — only a connect failure (never reached the device) or a 401
+is an error. Do NOT route reboot through the normal `read()` path (which waits
+to parse a JSON body that never arrives → false "timeout" error). Verified by a
+regression test in `tests/client_mock.rs` (`reboot_ok_when_device_drops_after_send`).
 
 **CSRF token**: any GET (`/index.html`) returns `Set-Cookie: csrf_token=<hex>`.
 Empirically the token is **reusable indefinitely** and reads **don't even

@@ -54,7 +54,7 @@ impl AppState {
         let mut clients = Vec::with_capacity(cfg.device.len());
         for dev in &cfg.device {
             let creds = cfg.creds_for(dev)?;
-            let opts = ClientOpts { request_timeout, connect_timeout };
+            let opts = ClientOpts { request_timeout, connect_timeout, verbose: false };
             let client = Client::new(&dev.host, creds, opts)?;
             clients.push((dev.name.clone(), dev.host.clone(), client));
         }

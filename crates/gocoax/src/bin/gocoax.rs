@@ -7,6 +7,9 @@ use std::time::Duration;
 #[derive(Parser)]
 #[command(name = "gocoax")]
 struct Cli {
+    /// Log each HTTP request and its outcome to stderr.
+    #[arg(short, long, global = true)]
+    verbose: bool,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -41,6 +44,7 @@ enum Cmd {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
+    let verbose = cli.verbose;
     match cli.cmd {
         Cmd::Status { config, device } => {
             let cfg = load_config(&config)?;
@@ -64,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if all_mode {
                     println!("===== {} ({}) =====", dev.name, dev.host);
                 }
-                match status_one(&cfg, dev).await {
+                match status_one(&cfg, dev, verbose).await {
                     Ok(s) => println!("{s:#?}"),
                     // In all-devices mode, one adapter failing must not abort
                     // the rest — report it and keep going.
@@ -84,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("refusing to reboot {device} without --yes");
                 std::process::exit(2);
             }
-            let (_cfg, client) = build(&config, &device)?;
+            let (_cfg, client) = build(&config, &device, verbose)?;
             client.reboot().await?;
             println!("reboot sent to {device}");
         }
@@ -105,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     eprintln!("--self-report requires --config and --device");
                     std::process::exit(2);
                 };
-                let (_cfg, client) = build(&config, &device)?;
+                let (_cfg, client) = build(&config, &device, verbose)?;
                 let nodes = client.moca_nodes().await?;
                 for n in &nodes {
                     println!("{n:?}");
@@ -124,11 +128,12 @@ fn load_config(config_path: &str) -> Result<Config, Box<dyn std::error::Error>> 
     Ok(Config::from_toml(&text)?)
 }
 
-fn client_for(cfg: &Config, dev: &Device) -> Result<Client, Box<dyn std::error::Error>> {
+fn client_for(cfg: &Config, dev: &Device, verbose: bool) -> Result<Client, Box<dyn std::error::Error>> {
     let creds = cfg.creds_for(dev)?;
     let opts = ClientOpts {
         request_timeout: Duration::from_secs(cfg.request_timeout_secs),
         connect_timeout: Duration::from_secs(cfg.connect_timeout_secs),
+        verbose,
     };
     Ok(Client::new(&dev.host, creds, opts)?)
 }
@@ -136,18 +141,23 @@ fn client_for(cfg: &Config, dev: &Device) -> Result<Client, Box<dyn std::error::
 async fn status_one(
     cfg: &Config,
     dev: &Device,
+    verbose: bool,
 ) -> Result<gocoax::DeviceStatus, Box<dyn std::error::Error>> {
-    let client = client_for(cfg, dev)?;
+    let client = client_for(cfg, dev, verbose)?;
     Ok(client.device_status().await?)
 }
 
-fn build(config_path: &str, device: &str) -> Result<(Config, Client), Box<dyn std::error::Error>> {
+fn build(
+    config_path: &str,
+    device: &str,
+    verbose: bool,
+) -> Result<(Config, Client), Box<dyn std::error::Error>> {
     let cfg = load_config(config_path)?;
     let dev = cfg
         .device
         .iter()
         .find(|d| d.name == device)
         .ok_or_else(|| format!("device {device} not in config"))?;
-    let client = client_for(&cfg, dev)?;
+    let client = client_for(&cfg, dev, verbose)?;
     Ok((cfg, client))
 }

@@ -1,0 +1,11 @@
+username = "admin"
+# password = "..."          # or use password_env / password_file
+# password_env = "GOCOAX_PW"
+listen = "0.0.0.0:9420"
+request_timeout_secs = 8
+connect_timeout_secs = 3
+scrape_deadline_secs = 9
+
+[[device]]
+name = "moca-1"
+host = "192.0.2.250"

@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["crates/gocoax", "crates/gocoax-exporter"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+axum = "0.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+thiserror = "1"
+clap = { version = "4", features = ["derive"] }
+wiremock = "0.6"
+
+# Lightweight release binaries: strip symbols + thin LTO + single codegen unit.
+# (Compile time is traded for smaller, faster binaries — a deliberate choice.)
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1

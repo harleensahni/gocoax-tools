@@ -1,0 +1,20 @@
+[package]
+name = "gocoax"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+wiremock.workspace = true
+
+[[bin]]
+name = "gocoax"
+path = "src/bin/gocoax.rs"

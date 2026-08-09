@@ -1,0 +1,429 @@
+<!DOCTYPE HTML>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>Device Status</title>
+<link rel="stylesheet" href="style.css" type="text/css">
+<script language="javascript" src="main.js"></script>
+<script language="javascript">
+function _wTR(name,id){_w('<tr><td class="form_label">'+name+'</td><td id="'+id+'"></td><td></td></tr>');}
+
+var chipArray= new Array("MXL370x", "MXL371x", "UNKNOWN");
+var localInfoVal;
+var netInfoVal = 0;
+var macInfoVal = 0;
+var frameInfoVal = 0;
+var ethInfoVal = 0;
+
+var lof;
+var ipAddr;
+var lofVal;
+var ipAddrVal;
+var chipId;
+var chipIdVal;
+var chipName;
+
+/* Taken from Local Info */
+var myNodeId;
+var nwMocaVerVal;
+var mocalinkStatusVal;
+var socVersionVal;
+
+/* Taken from Net Info */
+//var pakageVerVal;
+var macAddressVal;
+var myMocaVerVal;
+
+/* Taken from Eth Info */
+var speedArray= new Array("10Mbps", "100Mbps", "1Gbps", "Auto-Neg", "2.5Gbps", "NA");
+var ethTxVal;
+var ethRxVal;
+var ethLinkVal = "";
+var ethSpeedVal = "";
+var ethDuplexVal = "";
+
+/* Taken from Frame Info */
+var txgood;
+var txbad;
+var txdropped;
+var rxgood;
+var rxbad;
+var rxdropped;
+
+var progresCnt = 1;
+var miscphyinfoVal;
+var miscm25phyinfoVal;
+var loftemp;
+var beaconCh;
+var primaryLof;
+var secondaryLof;
+var primaryLofOffset;
+var secondaryLofOffset;
+var firstChannel;
+var numChannels;
+var gpioVal;
+var custombandprofcgapmode;
+
+var socName;
+
+function cutS(s)
+{
+    if("string" != (typeof s))
+        return 0;
+    return s.slice(0);
+}
+
+function n2s(n,base)
+{
+    var num = parseInt(n);
+    var mac = "";
+    if(num < 0xF)
+        mac = "0";
+    mac += num.toString(base);
+    return mac;
+}
+
+function hex2mac(hi, lo)
+{
+    var mac = n2s(hi>>24&0xff,16)+":"+n2s((hi>>16)&0xff,16)+":"+n2s((hi>>8)&0xff,16)+":"+n2s(hi&0xff,16)+":"+n2s(lo>>24&0xff,16)+":"+n2s((lo>>16)&0xff,16);
+    return mac;
+}
+
+function isAscii(c){return (c>0 && c<0x80);}
+
+function hex2ascii()
+{
+    var i=0, j=0, b=0, hex=0, s="";
+    for(j=0;j<arguments.length;j++)
+    {
+        hex = parseInt(arguments[j],16);
+        for(i=0;i<4;i++)
+        {
+            b=(hex>>((3-i)*8)) & 0xff;
+            if(!isAscii(b))return s;
+            s += String.fromCharCode(b);
+        }
+    }
+    return s;
+}
+
+function refreshPage()
+{
+    // From localInfo
+    var nwMocaVer = parseInt(cutS(localInfoVal[11]), 16);
+    nwMocaVerVal = (nwMocaVer>>4&0xf)+"."+((nwMocaVer>>0)&0xf);
+    var mocalinkStatus = parseInt(cutS(localInfoVal[5]), 16);
+    mocalinkStatusVal = (mocalinkStatus==0?"Down":"Up");
+
+    var socVersion = '';
+    var retVal;
+    var i = 0;
+    do
+    {
+        retVal = byte2ascii(localInfoVal[21+i].slice(2,10));
+        socVersion  += retVal;
+        i++;
+    } while (retVal);
+
+    // Extract the bond option(16-19 bits)
+    chipId = parseInt(chipIdVal);
+	socName = chipId;
+    chipId = (chipId - 0x15);
+
+    if (chipId >= chipArray.length)
+    {
+        chipId = chipArray.length - 1;
+    }
+    chipName = chipArray[chipId];
+    socVersionVal = chipName + "." + socVersion;
+
+    // From netInfo
+    var hi = parseInt(macInfoVal[0], 16);
+    var lo = parseInt(macInfoVal[1], 16);
+    macAddressVal = hex2mac(hi,lo);
+    var myMocaVer = parseInt(cutS(netInfoVal[4]), 16);
+    myMocaVerVal = (myMocaVer>>4&0xf)+"."+((myMocaVer>>0)&0xf);
+
+    //From ethInfo
+    var i, maxport = 0;
+    if (chipName == "MXL371x")
+    {
+        maxport = 2;
+    }
+    else
+    {
+        // MXL370x only one SGMII
+        maxport = 1;
+    }
+
+    var status = "";
+    for(i=1; i<maxport; i++)
+    {
+        //Link Status
+        var temp = parseInt(ethInfoVal[i*3+0], 16);
+        status = (temp==0?"Down":"Up");
+		ethLinkVal += "Port "+i+":&nbsp;"+status+"<br />";
+
+        //Speed
+        status = "";
+        temp = parseInt(ethInfoVal[i*3+1], 16);
+        if (temp >= speedArray.length)
+        {
+            temp = speedArray.length - 1;
+        }
+        status = speedArray[temp];
+		ethSpeedVal += "Port "+i+":&nbsp;"+status+"<br />";
+
+        //Duplex
+        status = "";
+		temp = parseInt(ethInfoVal[i*3+2], 16);
+        status = (temp==0?"Half":"Full");
+		ethDuplexVal += "Port "+i+":&nbsp;"+status+"<br />";
+    }
+
+    // From frameInfo
+    txgood = ((parseInt(cutS(frameInfoVal[12]), 16)&0xffffffff)*4294967296)+parseInt(cutS(frameInfoVal[13]), 16);
+    txbad = ((parseInt(cutS(frameInfoVal[30]), 16)&0xffffffff)*4294967296)+parseInt(cutS(frameInfoVal[31]), 16);
+    txdropped = ((parseInt(cutS(frameInfoVal[48]), 16)&0xffffffff)*4294967296)+parseInt(cutS(frameInfoVal[49]), 16);
+    ethTxVal = "Tx Good:&nbsp;"+txgood+"<br />Tx Bad:&nbsp;"+txbad+"<br />Tx Dropped:&nbsp;"+txdropped;
+
+    rxgood = ((parseInt(cutS(frameInfoVal[66]), 16)&0xffffffff)*4294967296)+parseInt(cutS(frameInfoVal[67]), 16);
+    rxbad = ((parseInt(cutS(frameInfoVal[84]), 16)&0xffffffff)*4294967296)+parseInt(cutS(frameInfoVal[85]), 16);
+    rxdropped = ((parseInt(cutS(frameInfoVal[102]), 16)&0xffffffff)*4294967296)+parseInt(cutS(frameInfoVal[103]), 16);
+    ethRxVal = "Rx Good:&nbsp;"+rxgood+"<br />Rx Bad:&nbsp;"+rxbad+"<br />Rx Dropped:&nbsp;"+rxdropped;
+
+    ipAddr = parseInt(ipAddr, 16);
+    ipAddrVal = (ipAddr>>24&0xff)+"."+((ipAddr>>16)&0xff)+"."+((ipAddr>>8)&0xff)+"."+(ipAddr&0xff);
+    lofVal = parseInt(lof, 16);
+
+
+	loftemp = parseInt(miscphyinfoVal[1], 16);
+	beaconCh = loftemp;
+	primaryLofOffset = parseInt(localInfoVal[18], 16);
+	secondaryLofOffset = parseInt(localInfoVal[19], 16);
+	custombandprofcgapmode = parseInt(localInfoVal[28], 16);
+	switch (primaryLofOffset)
+	{
+	  case 0:
+		primaryLof = loftemp;
+		break;
+
+	  case 1:
+		primaryLof = loftemp + 25;
+		break;
+
+	  case 2:
+		primaryLof = loftemp - 25;
+		break;
+
+	  default:
+		primaryLof = 0;
+	}
+
+	switch (secondaryLofOffset)
+	{
+	  case 1:
+	    if(custombandprofcgapmode)
+			secondaryLof = primaryLof - 125;
+		else
+			secondaryLof = primaryLof - 100;
+		break;
+
+	  case 2:
+		if(custombandprofcgapmode)
+			secondaryLof = primaryLof + 125;
+		else
+			secondaryLof = primaryLof + 100;
+		break;
+
+	  case 0:
+	  default:
+		secondaryLof = 0;
+	}
+    if (chipName == "MXL370x")
+    {
+      firstChannel = "N/A"
+      numChannels = "N/A"
+    }
+    else
+    {
+      firstChannel = parseInt(miscm25phyinfoVal[2], 16);
+      numChannels = parseInt(miscm25phyinfoVal[3], 16);
+    }
+
+    document.getElementById("socV").innerHTML       = socVersionVal
+    document.getElementById("nodeV").innerHTML      = myMocaVerVal;
+    document.getElementById("netV").innerHTML       = nwMocaVerVal;
+    document.getElementById("ip").innerHTML         = ipAddrVal;
+    document.getElementById("mac").innerHTML        = macAddressVal;
+    document.getElementById("mocalink").innerHTML   = mocalinkStatusVal
+    document.getElementById("bcnch").innerHTML      = beaconCh
+    document.getElementById("prilof").innerHTML     = primaryLof;
+    document.getElementById("seclof").innerHTML     = secondaryLof;
+    document.getElementById("firstchannel").innerHTML = firstChannel;
+    document.getElementById("numchannels").innerHTML = numChannels;
+    document.getElementById("ethlink").innerHTML    = ethLinkVal;
+    document.getElementById("ethspeed").innerHTML   = ethSpeedVal;
+    document.getElementById("ethduplex").innerHTML  = ethDuplexVal;
+    document.getElementById("ethtx").innerHTML      = ethTxVal;
+    document.getElementById("ethrx").innerHTML      = ethRxVal;
+    document.getElementById("gpio").innerHTML       = gpioVal;
+    document.getElementsByTagName("body")[0].style.cursor = "auto";
+}
+
+function formLoad()
+{
+
+    switch(progresCnt)
+    {
+        case 1: doFormGetJSON(document.localInfo, "devStatus.html",function(data, nu) {localInfoVal  = data.data; myNodeId = parseInt(cutS(localInfoVal[0]), 16);  formLoad();}, function(data) {}, 0);
+                document.getElementsByTagName("body")[0].style.cursor = "wait";
+                progresCnt++;
+        break;
+
+        case 2: doFormGetJSON(document.miscphyinfo, "devStatus.html",function(data, nu) {miscphyinfoVal  = data.data; formLoad();}, function(data) {}, 0);
+                progresCnt++;
+        break;
+
+        case 3: document.netInfo.data.value = myNodeId;
+                doFormGetJSON(document.netInfo,   "devStatus.html",function(data, nu) {netInfoVal    = data.data; formLoad();}, function(data) {}, 0);
+                progresCnt++;
+        break;
+
+        case 4: document.macInfo.data.value = myNodeId;
+                doFormGetJSON(document.macInfo,   "devStatus.html",function(data, nu) {macInfoVal    = data.data; formLoad();}, function(data) {}, 0);
+                progresCnt++;
+        break;
+
+        case 5: doFormGetJSON(document.frameInfo, "devStatus.html",function(data, nu) {frameInfoVal  = data.data; formLoad();}, function(data) {}, 0);
+                progresCnt++;
+        break;
+
+        case 6: doFormGetJSON(document.lof,       "devStatus.html",function(data, nu) {lof           = data.data; formLoad();}, function(data) {}, 0);
+                progresCnt++;
+        break;
+
+        case 7: doFormGetJSON(document.ipAddr,    "devStatus.html",function(data, nu) {ipAddr        = data.data; formLoad();}, function(data) {}, 0);
+                progresCnt++;
+        break;
+
+        case 8: doFormGetJSON(document.ChipID,    "devStatus.html",function(data, nu) {chipIdVal     = data.data; formLoad();}, function(data) {}, 0);
+                progresCnt++;
+        break;
+
+        case 9: doFormGetJSON(document.gpio,    "devStatus.html",function(data, nu) {gpioVal     = data.data; formLoad();}, function(data) {}, 0);
+                progresCnt++;
+        break;
+
+        case 10: doFormGetJSON(document.ethInfo, "devStatus.html",function(data, nu) {ethInfoVal  = data.data; formLoad();}, function(data) {}, 0);
+                progresCnt++;
+        break;
+
+        case 11: doFormGetJSON(document.miscm25phyinfo, "devStatus.html",function(data, nu) {miscm25phyinfoVal = data.data; refreshPage();}, function(data) {}, 0);
+                progresCnt = 1;
+        break;
+
+        default:
+        break;
+    }
+
+}
+</script>
+
+</head>
+<body onload="formLoad()">
+<div id="container">
+
+<script language="javascript">
+    createMenu();
+</script>
+
+<div id="midMain">
+    <div id="pageTitle">
+    <table align="center">
+        <tr><td class="topTitle">Device Status</td></tr>
+    </table>
+    </div>
+
+    <div id="pageContent">
+    <table align="center" id="box_header">
+        <tr><td class="topheader">Device Status</td></tr>
+        <tr><td class="content">The following display shows the current status and settings.</td></tr>
+    </table>
+
+    <table id="body_header">
+        <tr><td class="topheader">Device Status
+        <form name="localInfo" method="post" action="/ms/0/0x15">
+        <input type="hidden" name="data" value="" disabled="true" />
+        </form>
+        <form name="miscphyinfo" method="post" action="/ms/0/0x24">
+        <input type="hidden" name="data" value="" disabled="true" />
+        </form>
+        <form name="netInfo" method="post" action="/ms/0/0x16">
+        <input type="hidden" name="data" value="0" disabled="true" />
+        </form>
+        <form name="macInfo" method="post" action="/ms/1/0x103/GET">
+        <input type="hidden" name="data" value="0" disabled="true" />
+        </form>
+        <form name="frameInfo" method="post" action="/ms/0/0x14">
+        <input type="hidden" name="data" value="0" disabled="true" />
+        </form>
+        <form name="ChipID" method="post" action="/ms/1/0x303/GET">
+        <input type="hidden" name="data" value="0" disabled="true" />
+        </form>
+        <form name="gpio" method="post" action="/ms/1/0xb17">
+        <input type="hidden" name="data" value="0" disabled="true" />
+        </form>
+        <form name="miscm25phyinfo" method="post" action="/ms/0/0x7f">
+        <input type="hidden" name="data" value="" disabled="true" />
+        </form>
+        <form name="ethInfo" method="post" action="/ms/1/0x307/GET">
+        <input type="hidden" name="data" value="0" disabled="true" />
+        </form>
+        <form name="lof" method="post" action="/ms/0/0x1003/GET"></form>
+        <form name="ipAddr" method="post" action="/ms/1/0x20b/GET"></form>
+        </td></tr>
+        <tr><td class="content">
+        <table class="formarea">
+        <script language="javascript">
+        _wTR("SOC Version:","socV");
+        _wTR("My MoCA Version:","nodeV");
+        _wTR("Network MoCA Version:","netV");
+        _wTR("IP Address:","ip");
+        _wTR("MAC Address:","mac");
+        _wTR("MoCA Link Status:","mocalink");
+        _wTR("Beacon Channel:","bcnch");
+        _wTR("Primary Channel:","prilof");
+        _wTR("Secondary Channel:","seclof");
+        _wTR("First Channel:","firstchannel");
+        _wTR("Number of Channels:","numchannels");
+        _wTR("Ethernet Link Status:","ethlink");
+        _wTR("Ethernet Link Speed:","ethspeed");
+        _wTR("Ethernet Link Duplex:","ethduplex");
+        _wTR("Ethernet TX:<br />&nbsp;<br />&nbsp;","ethtx");
+        _wTR("Ethernet RX:<br />&nbsp;<br />&nbsp;","ethrx");
+        _wTR("<!--GPIO:-->","<!--gpio-->");
+        </script>
+        </table>
+        </td></tr>
+
+        <tr><td align="center"><input id="btnRefresh" type="button" value="Refresh" disabled="disabled" onclick="doRefresh()" /></td></tr>
+    </table>
+     </div>
+</div>
+
+<script language="javascript">
+    showRight("devStatus");
+</script>
+
+<div class="clear">
+</div>
+
+<script language="javascript">
+    showFooter();
+    setTimeout("enableRefresh(1)", 2000);
+</script>
+
+</div>
+<div id="msout" style="visibility:hidden"></div>
+</body>
+</html>

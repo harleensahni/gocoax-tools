@@ -1,0 +1,16 @@
+[package]
+name = "gocoax-exporter"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+gocoax = { path = "../gocoax" }
+tokio.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+wiremock.workspace = true

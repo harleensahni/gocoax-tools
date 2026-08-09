@@ -1,0 +1,14 @@
+# Secrets — never commit device credentials
+.credentials
+*.credentials
+config.toml
+config.local.toml
+
+# Rust
+/target
+**/target
+Cargo.lock.orig
+
+# OS / editor
+.DS_Store
+*.swp

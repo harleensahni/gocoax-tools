@@ -97,6 +97,47 @@ scrape_configs:
       - targets: ["<exporter-host>:9420"]
 ```
 
+## Running as a container
+
+The exporter ships as a tiny (~2.5 MB) static image on `scratch`. **Run it on a
+host that can reach your adapters' LAN** (e.g. the same box as Grafana); your
+Prometheus server can live anywhere and just scrapes `<that-host>:9420`.
+
+Everything below works identically with **docker** or **podman** (swap the
+command name).
+
+**Pull and run the published image:**
+
+```bash
+# put your config next to you; the password can come from an env var so it's
+# not baked into any file — set `password_env = "GOCOAX_PW"` in config.toml
+docker run -d --name gocoax-exporter --restart unless-stopped \
+  -p 9420:9420 \
+  -e GOCOAX_PW="your-device-password" \
+  -v "$PWD/config.toml:/etc/gocoax/config.toml:ro" \
+  ghcr.io/harleensahni/gocoax-tools:latest
+```
+
+(`podman run …` is identical.) The image is published by the
+`build-and-publish-image` GitHub Actions workflow on every push to `main`.
+
+**Or build it locally** (works on any arch — builds a static binary for the
+host's architecture):
+
+```bash
+docker build -t gocoax-exporter .
+docker run -d --restart unless-stopped -p 9420:9420 \
+  -e GOCOAX_PW="your-device-password" \
+  -v "$PWD/config.toml:/etc/gocoax/config.toml:ro" \
+  gocoax-exporter
+```
+
+**Or with compose** (`docker compose up -d` / `podman-compose up -d`) — see
+[`compose.yaml`](compose.yaml).
+
+Then point Prometheus (wherever it runs) at `<container-host>:9420` using the
+scrape config above. Check it's working: `curl <container-host>:9420/metrics`.
+
 ## CLI
 
 The `gocoax` binary talks to one device directly (mainly for ad-hoc checks

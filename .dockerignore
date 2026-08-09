@@ -1,0 +1,10 @@
+target
+.git
+.github
+.credentials
+*.credentials
+config.toml
+config.local.toml
+.superpowers
+docs
+*.md

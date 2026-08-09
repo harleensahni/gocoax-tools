@@ -1,0 +1,23 @@
+# Run the exporter with `docker compose up -d` or `podman-compose up -d`.
+#
+# Requires a config.toml next to this file (see config.example.toml). Put the
+# device password in an env var and reference it from the config with
+#   password_env = "GOCOAX_PW"
+# so no secret is baked into the image or the compose file.
+#
+#   GOCOAX_PW=... docker compose up -d      # or: podman-compose up -d
+
+services:
+  gocoax-exporter:
+    # Pull the published image...
+    image: ghcr.io/harleensahni/gocoax-tools:latest
+    # ...or build locally instead by uncommenting:
+    # build: .
+    restart: unless-stopped
+    ports:
+      - "9420:9420"
+    volumes:
+      - ./config.toml:/etc/gocoax/config.toml:ro
+    environment:
+      # Only needed if config.toml uses `password_env = "GOCOAX_PW"`.
+      - GOCOAX_PW=${GOCOAX_PW:-}

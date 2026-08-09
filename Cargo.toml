@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/gocoax", "crates/gocoax-exporter"]
+members = ["crates/gocoax", "crates/gocoax-exporter", "crates/gocoax-remediator"]
 
 [workspace.package]
 edition = "2021"

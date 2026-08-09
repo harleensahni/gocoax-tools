@@ -1,0 +1,18 @@
+[package]
+name = "gocoax-remediator"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+gocoax = { path = "../gocoax" }
+tokio.workspace = true
+reqwest.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+wiremock.workspace = true

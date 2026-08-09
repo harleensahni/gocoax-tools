@@ -494,6 +494,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "gocoax-remediator"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "clap",
+ "gocoax",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+ "wiremock",
+]
+
+[[package]]
 name = "h2"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"

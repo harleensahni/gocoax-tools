@@ -829,7 +829,7 @@
       "id": 19,
       "type": "table",
       "title": "Device Inventory",
-      "description": "gocoax_info{device,host,mac,ip,soc_version,moca_version} -- always 1; a label carrier for device identity/firmware.",
+      "description": "gocoax_info identity (device/host/mac/ip/versions) plus per-device Ethernet frame totals (tx/rx good/bad/dropped).",
       "gridPos": {
         "h": 8,
         "w": 24,
@@ -850,6 +850,201 @@
           "expr": "gocoax_info{device=~\"$device\"}",
           "format": "table",
           "instant": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (device) (gocoax_ethernet_tx_frames_total{device=~\"$device\",status=\"good\"})",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (device) (gocoax_ethernet_tx_frames_total{device=~\"$device\",status=\"bad\"})",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (device) (gocoax_ethernet_tx_frames_total{device=~\"$device\",status=\"dropped\"})",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (device) (gocoax_ethernet_rx_frames_total{device=~\"$device\",status=\"good\"})",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (device) (gocoax_ethernet_rx_frames_total{device=~\"$device\",status=\"bad\"})",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (device) (gocoax_ethernet_rx_frames_total{device=~\"$device\",status=\"dropped\"})",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "device",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true,
+              "Value #A": true,
+              "Time #A": true,
+              "__name__ #A": true,
+              "Time #B": true,
+              "__name__ #B": true,
+              "Time #C": true,
+              "__name__ #C": true,
+              "Time #D": true,
+              "__name__ #D": true,
+              "Time #E": true,
+              "__name__ #E": true,
+              "Time #F": true,
+              "__name__ #F": true,
+              "Time #G": true,
+              "__name__ #G": true
+            },
+            "renameByName": {
+              "Value #B": "TX good",
+              "Value #C": "TX bad",
+              "Value #D": "TX dropped",
+              "Value #E": "RX good",
+              "Value #F": "RX bad",
+              "Value #G": "RX dropped"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "Remediation",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Reboots (5m increase)",
+      "description": "Successful reboots performed by the remediator.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 50
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "increase(gocoax_remediator_reboots_total{device=~\"$device\"}[5m])",
+          "legendFormat": "{{device}} {{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Reboots (24h) by device/reason",
+      "description": "Per-device/reason reboot count over the last 24h.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 50
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "increase(gocoax_remediator_reboots_total{device=~\"$device\"}[24h])",
+          "instant": true
         }
       ],
       "options": {
@@ -866,11 +1061,326 @@
             "excludeByName": {
               "Time": true,
               "__name__": true,
-              "Value": true
+              "instance": true,
+              "job": true
+            },
+            "renameByName": {
+              "Value": "reboots (24h)"
             }
           }
         }
       ]
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "Circuit breaker open",
+      "description": "1 = too many reboots today; remediator stopped touching this device.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 58
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "gocoax_remediator_circuit_open{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 24,
+      "type": "stat",
+      "title": "Time since last reboot (s)",
+      "description": "Seconds since each device's last successful reboot.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 58
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "time() - gocoax_remediator_last_reboot_timestamp_seconds{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Reboot failures / would-reboot (1h increase)",
+      "description": "Failed reboot attempts, and dry-run 'would reboot' events.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 58
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "increase(gocoax_remediator_reboot_failures_total{device=~\"$device\"}[1h])",
+          "legendFormat": "{{device}} fail {{reason}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "increase(gocoax_remediator_would_reboot_total{device=~\"$device\"}[1h])",
+          "legendFormat": "{{device}} would {{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "row",
+      "title": "Ethernet frame rates (good / bad / dropped)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 64
+      },
+      "panels": []
+    },
+    {
+      "id": 27,
+      "type": "timeseries",
+      "title": "Ethernet TX frame rate",
+      "description": "Per-status TX frame rate. Note: 'good' dwarfs bad/dropped on a linear axis.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 65
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(gocoax_ethernet_tx_frames_total{device=~\"$device\",status=\"good\"}[5m])",
+          "legendFormat": "{{device}} tx good"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(gocoax_ethernet_tx_frames_total{device=~\"$device\",status=\"bad\"}[5m])",
+          "legendFormat": "{{device}} tx bad"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(gocoax_ethernet_tx_frames_total{device=~\"$device\",status=\"dropped\"}[5m])",
+          "legendFormat": "{{device}} tx dropped"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "timeseries",
+      "title": "Ethernet RX frame rate",
+      "description": "Per-status RX frame rate.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 65
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(gocoax_ethernet_rx_frames_total{device=~\"$device\",status=\"good\"}[5m])",
+          "legendFormat": "{{device}} rx good"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(gocoax_ethernet_rx_frames_total{device=~\"$device\",status=\"bad\"}[5m])",
+          "legendFormat": "{{device}} rx bad"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(gocoax_ethernet_rx_frames_total{device=~\"$device\",status=\"dropped\"}[5m])",
+          "legendFormat": "{{device}} rx dropped"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     }
   ]
 }

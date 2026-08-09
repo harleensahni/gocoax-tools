@@ -194,8 +194,11 @@ The dashboard has two template variables:
   device)`, used to filter every panel to one or more configured devices.
 
 Panels cover device health (`up` + last-good-read age), the PHY rate matrix,
-MoCA link/node state, Ethernet link/speed/error-rates, exporter scrape
-health, and a device inventory table.
+MoCA link/node state, Ethernet link/speed and full TX/RX frame-rate breakdown
+(good/bad/dropped), exporter scrape health, a **Remediation** section (reboots,
+circuit-breaker state, time-since-last-reboot, failures/would-reboot), and a
+device inventory table that also carries per-device TX/RX frame totals. Reboots
+appear as red annotations across every panel.
 
 ## Automatic remediation (optional)
 

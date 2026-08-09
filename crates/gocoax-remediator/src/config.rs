@@ -52,6 +52,10 @@ pub struct RemediatorConfig {
     pub listen: String,
     #[serde(default = "d_dry_run")]
     pub dry_run: bool,
+    /// Log each poll cycle and per-device decision (matched rule, cooldown,
+    /// breaker, action) to stderr. Off by default.
+    #[serde(default)]
+    pub verbose: bool,
     /// Trigger rules; may be empty (the daemon just polls nothing and
     /// exposes /metrics).
     #[serde(default)]

@@ -121,7 +121,16 @@ impl AppState {
 ///   after the breaker condition stops holding (e.g. a day rollover).
 pub async fn poll_once<R: Rebooter>(state: &AppState, now_unix: f64, today: &str, rebooter: &R) {
     let limits = Limits { cooldown_secs: state.rcfg.cooldown_secs, max_reboots_per_day: state.rcfg.max_reboots_per_day };
+    let verbose = state.rcfg.verbose;
     let mut handled_this_poll: HashSet<String> = HashSet::new();
+
+    if verbose {
+        eprintln!(
+            "gocoax-remediator: poll: evaluating {} rule(s){}",
+            state.rcfg.rule.len(),
+            if state.rcfg.dry_run { " [dry-run]" } else { "" }
+        );
+    }
 
     for rule in &state.rcfg.rule {
         let devices = match query_devices(&state.http, &state.rcfg.prometheus_url, &rule.expr).await {
@@ -131,6 +140,13 @@ pub async fn poll_once<R: Rebooter>(state: &AppState, now_unix: f64, today: &str
                 continue;
             }
         };
+        if verbose {
+            eprintln!(
+                "gocoax-remediator:   rule '{}' matched {} device(s): {devices:?}",
+                rule.name,
+                devices.len()
+            );
+        }
 
         for device_name in devices {
             if handled_this_poll.contains(&device_name) {
@@ -145,10 +161,10 @@ pub async fn poll_once<R: Rebooter>(state: &AppState, now_unix: f64, today: &str
                 continue;
             };
 
-            let decision = {
+            let (decision, st) = {
                 let inner = state.inner.lock().unwrap();
                 let st = inner.devices.get(&device_name).cloned().unwrap_or_default();
-                decide(&st, &limits, now_unix, today)
+                (decide(&st, &limits, now_unix, today), st)
             };
 
             // Always refresh circuit_open to match the latest decision, so
@@ -200,9 +216,27 @@ pub async fn poll_once<R: Rebooter>(state: &AppState, now_unix: f64, today: &str
                         }
                     }
                 }
-                Decision::Cooldown | Decision::CircuitOpen => {
-                    // Cooldown: skip silently, expected. CircuitOpen: the
-                    // circuit_open metric above already recorded it.
+                Decision::Cooldown => {
+                    // Expected/quiet unless verbose. Report how long is left.
+                    if verbose {
+                        let left = st
+                            .last_reboot_unix
+                            .map(|last| (last + limits.cooldown_secs as f64 - now_unix).max(0.0))
+                            .unwrap_or(0.0);
+                        eprintln!(
+                            "gocoax-remediator:     device={device_name} reason={} -> in cooldown ({left:.0}s left), skipping",
+                            rule.name
+                        );
+                    }
+                }
+                Decision::CircuitOpen => {
+                    // circuit_open metric already set above.
+                    if verbose {
+                        eprintln!(
+                            "gocoax-remediator:     device={device_name} reason={} -> circuit breaker open (>= {} reboots today), skipping",
+                            rule.name, limits.max_reboots_per_day
+                        );
+                    }
                 }
             }
         }
@@ -280,6 +314,7 @@ mod tests {
             max_reboots_per_day,
             listen: "127.0.0.1:0".into(),
             dry_run,
+            verbose: false,
             rule: rules,
         }
     }

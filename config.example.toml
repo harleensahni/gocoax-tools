@@ -20,6 +20,8 @@ max_reboots_per_day = 4       # circuit breaker per device
 listen = "0.0.0.0:9421"       # its own /metrics
 dry_run = true                # SAFE default: logs "would reboot" only.
                               # set false for fully-automatic reboots.
+verbose = false               # set true to log each poll + per-device decision
+                              # (matched rule / cooldown / breaker) to stderr
 
 # Each rule's PromQL must return series carrying a `device` label; any device
 # returned is rebooted (subject to cooldown/breaker). The rule name becomes the

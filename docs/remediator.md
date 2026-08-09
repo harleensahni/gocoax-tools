@@ -95,6 +95,27 @@ name = "rx_drops"
 expr = 'avg_over_time(rate(gocoax_ethernet_rx_frames_total{status="dropped"}[5m])[15m:]) > 0.001'
 ```
 
+## Logging / visibility
+
+By default the daemon is quiet: it logs startup, every reboot / would-reboot /
+failure, and warnings (a rule query that failed, or a matched device missing
+from config). It does **not** log routine "nothing wrong" polls or cooldown
+skips — so on a healthy system `docker logs` is nearly silent after startup.
+
+Set **`verbose = true`** in `[remediator]` to log each poll cycle and the
+per-device decision — the matched device set per rule, and for each matched
+device whether it's rebooting, in cooldown (with seconds left), or blocked by
+the circuit breaker. Handy while tuning thresholds or watching a dry-run:
+
+```
+gocoax-remediator: poll: evaluating 3 rule(s) [dry-run]
+gocoax-remediator:   rule 'rx_drops' matched 1 device(s): ["master-bedroom-moca"]
+gocoax-remediator:     device=master-bedroom-moca reason=rx_drops -> in cooldown (1140s left), skipping
+```
+
+The always-on `/metrics` counters (`would_reboot_total`, `reboots_total`, …)
+are the durable record; verbose logging is for real-time observation.
+
 ## State
 
 Cooldown / daily-count state is in-memory (resets on restart — acceptable for a

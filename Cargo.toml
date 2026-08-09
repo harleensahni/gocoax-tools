@@ -9,7 +9,11 @@ license = "MIT"
 
 [workspace.dependencies]
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.12", default-features = false, features = ["json"] }
+# hickory-dns = a pure-Rust DNS resolver that reads /etc/resolv.conf (search
+# domains + ndots) itself, so short hostnames resolve correctly even in a
+# static musl/scratch image (musl's libc resolver does not expand search
+# domains via Docker's embedded DNS).
+reqwest = { version = "0.12", default-features = false, features = ["json", "hickory-dns"] }
 axum = "0.7"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -134,7 +134,14 @@ headers or auth breaks completely.
   option B). The binary-size delta was measured negligible (~1.2 MB blocking
   vs ~2.0 MB async, HTTP-only) — size was not a real constraint either way.
 - **HTTP-only, no TLS.** The device itself only speaks plain HTTP; `reqwest`
-  is built with `default-features = false, features = ["json"]`.
+  is built with `default-features = false, features = ["json", "hickory-dns"]`.
+- **`hickory-dns` resolver (not the default libc one).** The release container
+  is a static **musl** binary on `scratch`, and musl's resolver does not expand
+  `search`-domain / short hostnames via Docker's embedded DNS (`127.0.0.11`) —
+  so `host = "first-floor-tv-moca"` in a compose stack would time out while a
+  Go exporter (blackbox) on the same network resolves it fine. `hickory-dns` is
+  a pure-Rust resolver that reads `resolv.conf` (search/ndots) itself, so short
+  names resolve in the image. FQDNs and IPs work with any resolver.
 - **Fetch-once-reuse CSRF**, not a token-per-request dance — reads don't even
   enforce the token; only Basic auth gates them (see protocol section above).
   This was verified empirically against the real device, not assumed.

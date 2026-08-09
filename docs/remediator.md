@@ -66,9 +66,19 @@ gocoax_remediator_last_reboot_timestamp_seconds{device}  unix ts of last *succes
 gocoax_remediator_circuit_open{device}                   1 = breaker tripped, no longer rebooting
 ```
 
+The three `*_total` counters and `circuit_open` are **zero-initialized at
+startup** for every configured `device × rule` pair, so the series exist at 0
+*before* the first event. This matters because Prometheus's
+`rate()`/`increase()`/`changes()` cannot see a counter's first increment if the
+series is *born* at 1 (there's no prior 0 sample to diff against) — so without
+seeding, a device's very first reboot would be invisible in every "increase"
+panel and draw no annotation. `last_reboot_timestamp_seconds` is deliberately
+*not* seeded (a 0 would render as "rebooted at the Unix epoch").
+
 Grafana: add an **annotation query** on `changes(gocoax_remediator_reboots_total[$__range]) > 0`
 (or `increase(...[1m]) > 0`) so each reboot draws a vertical marker across the
 dashboard, plus a "reboots (24h)" table from `increase(gocoax_remediator_reboots_total[24h])`.
+Because of the zero-init above, both fire correctly on the *first* reboot too.
 
 ## Config (extends the same `config.toml`)
 
@@ -121,4 +131,12 @@ are the durable record; verbose logging is for real-time observation.
 Cooldown / daily-count state is in-memory (resets on restart — acceptable for a
 home setup; a restart just clears the daily counter). Reboot counters are
 Prometheus counters, so their long-term history lives in Prometheus regardless
-of restarts.
+of restarts: on restart the in-memory counter drops back to 0, which Prometheus
+treats as a normal **counter reset** — `rate()`/`increase()` stitch across it,
+and already-scraped samples are never deleted. So `increase(...[24h])` remains
+the correct, restart-safe way to ask "how many reboots"; only the raw
+instantaneous counter value restarts from 0 (true of every Prometheus counter on
+process restart). The narrow loss window: a reboot in the seconds between its
+counter bump and the next Prometheus scrape, if the daemon then crashes, is
+absent from the counter (but still in the logs) — persisting state to disk would
+be the only fix, deferred as overkill for a home setup.

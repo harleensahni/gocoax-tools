@@ -73,7 +73,35 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(cfg: Config, rcfg: RemediatorConfig, http: reqwest::Client) -> AppState {
-        AppState { cfg, rcfg, http, inner: Mutex::new(Inner::default()) }
+        // Zero-initialize the per-(device,reason) counters and the per-device
+        // circuit-breaker gauge for every configured device x rule pair, so
+        // the series exist at 0 *before* the first event. Without this, a
+        // counter is born at value 1 on a device's first reboot, and
+        // Prometheus's rate()/increase()/changes() cannot see that first
+        // increment (there is no prior 0 sample to diff against) -- so the
+        // first-ever reboot of a device would be invisible in the "increase"
+        // panels and would draw no annotation. Seeding to 0 makes the initial
+        // 0->1 a visible increase.
+        //
+        // Restart-safe: on a daemon restart the in-memory counter drops (e.g.
+        // 3->0), which Prometheus treats as a normal counter reset -- rate()/
+        // increase() stitch across it and stored history is untouched (see
+        // docs/remediator.md "State").
+        //
+        // Deliberately NOT seeded: last_reboot_ts -- a 0 there would render as
+        // "rebooted at the Unix epoch", i.e. a ~56-year "time since last
+        // reboot". It stays absent until a real reboot sets it.
+        let mut inner = Inner::default();
+        for dev in &cfg.device {
+            inner.circuit_open.insert(dev.name.clone(), false);
+            for rule in &rcfg.rule {
+                let key = (dev.name.clone(), rule.name.clone());
+                inner.reboots_total.entry(key.clone()).or_insert(0);
+                inner.would_reboot_total.entry(key.clone()).or_insert(0);
+                inner.reboot_failures_total.entry(key).or_insert(0);
+            }
+        }
+        AppState { cfg, rcfg, http, inner: Mutex::new(inner) }
     }
 
     pub fn snapshot(&self) -> MetricsSnapshot {
@@ -329,6 +357,34 @@ mod tests {
 
     fn is_circuit_open(rows: &[(String, bool)], device: &str) -> bool {
         rows.iter().find(|(d, _)| d == device).map(|(_, o)| *o).unwrap_or(false)
+    }
+
+    #[tokio::test]
+    async fn new_zero_initializes_counters_for_first_event_visibility() {
+        // Every configured device x rule pair must be pre-seeded to 0 so a
+        // device's first reboot is a visible 0->1 increase in Prometheus
+        // (rate()/increase()/changes() cannot see a counter born at 1).
+        let state = AppState::new(
+            cfg_with_device("ff"),
+            rcfg("http://unused".into(), vec![rule("unreachable"), rule("link_down")], 1800, 4, false),
+            reqwest::Client::new(),
+        );
+        let snap = state.snapshot();
+
+        // Present at 0 for both rules, across all three counters.
+        for reason in ["unreachable", "link_down"] {
+            assert!(
+                snap.reboots_total.iter().any(|(d, r, c)| d == "ff" && r == reason && *c == 0),
+                "reboots_total[ff,{reason}] should be seeded to 0"
+            );
+            assert!(snap.would_reboot_total.iter().any(|(d, r, c)| d == "ff" && r == reason && *c == 0));
+            assert!(snap.reboot_failures_total.iter().any(|(d, r, c)| d == "ff" && r == reason && *c == 0));
+        }
+        // Circuit breaker gauge seeded closed (false) for the device.
+        assert!(snap.circuit_open.iter().any(|(d, o)| d == "ff" && !*o));
+        // last_reboot_ts must NOT be seeded: a 0 would read as "rebooted in
+        // 1970" (~56-year "time since last reboot"). Absent until a real reboot.
+        assert!(snap.last_reboot_ts.is_empty(), "last_reboot_ts must stay absent until a real reboot");
     }
 
     #[tokio::test]

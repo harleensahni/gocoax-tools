@@ -2,6 +2,7 @@
 name = "gocoax-exporter"
 edition.workspace = true
 version.workspace = true
+license.workspace = true
 
 [dependencies]
 gocoax = { path = "../gocoax" }

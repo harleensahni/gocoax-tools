@@ -199,3 +199,7 @@ There are two independent layers of "is this working":
 
 Counters end in `_total` and are monotonic, so `rate()`/`increase()` in
 Grafana/PromQL show error spikes cleanly.
+
+## License
+
+Licensed under the [MIT License](LICENSE).

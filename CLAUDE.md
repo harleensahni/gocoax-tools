@@ -14,7 +14,7 @@ one container image.
 gocoax-tools/
   Cargo.toml                       # [workspace], shared deps (tokio, reqwest, axum, ...)
   config.example.toml              # template for config.toml (git-ignored)
-  grafana-dashboard.json           # importable Grafana dashboard (19 panels)
+  grafana-dashboard.json           # importable Grafana dashboard (20 panels across 8 rows)
   crates/
     gocoax/                        # core library + CLI bin
       src/
@@ -43,10 +43,10 @@ gocoax-tools/
         scrape_integration.rs       # scrape() against a mock device server incl. deadline expiry
     gocoax-remediator/              # phase-3 auto-reboot daemon
       src/
-        config.rs                  # [remediator] table: prometheus_url, cooldown, breaker, rules, dry_run(default true)
+        config.rs                  # [remediator] table: prometheus_url, cooldown, breaker, rules, dry_run(default true), verbose
         prom.rs                    # Prometheus instant-query client -> device labels
         state.rs                   # cooldown + circuit-breaker state machine (pure, decide()/record_reboot())
-        poller.rs                  # poll_once(): query rules -> reboot (injectable Rebooter), safety gates
+        poller.rs                  # poll_once(): query rules -> reboot (injectable Rebooter), safety gates; AppState::new zero-inits reboot counters per device×rule (first-event visibility — keep)
         metrics.rs                 # remediator's own /metrics (reboots_total, circuit_open, ...)
         main.rs                    # config load + poll loop + axum /metrics
 ```

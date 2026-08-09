@@ -129,7 +129,16 @@ are the durable record; verbose logging is for real-time observation.
 ## State
 
 Cooldown / daily-count state is in-memory (resets on restart — acceptable for a
-home setup; a restart just clears the daily counter). Reboot counters are
+home setup). A restart clears **both** the daily circuit-breaker counter **and
+the per-device cooldown clock**, so be aware: **redeploying/restarting the daemon
+while a device is within its cooldown can trigger an immediate re-reboot** if a
+rule still matches (the fresh process has no memory of the recent reboot). This
+is most likely right after a reboot, when a rule keyed on a trailing window (e.g.
+the default `rx_drops`, `avg_over_time(...[15m:])`) can still be matching on the
+*previous* reboot's settling drops even though current drops are 0. The cooldown
+normally suppresses this; a restart removes that guard. Persisting state to disk
+would close the gap (deferred as overkill for a home setup); until then, avoid
+redeploying right after a reboot. Reboot counters are
 Prometheus counters, so their long-term history lives in Prometheus regardless
 of restarts: on restart the in-memory counter drops back to 0, which Prometheus
 treats as a normal **counter reset** — `rate()`/`increase()` stitch across it,

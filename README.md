@@ -4,7 +4,7 @@ Lightweight Rust tooling to observe GoCoax MoCA adapters (MaxLinear MXL371x
 family) over their web management interface, and expose their stats as
 Prometheus metrics for Grafana.
 
-The workspace has two crates:
+The workspace has three crates:
 
 - **`gocoax`** (`crates/gocoax`) — core library: an async client for the
   device's register-read HTTP protocol, typed decoders for device status /
@@ -13,6 +13,11 @@ The workspace has two crates:
   by hand.
 - **`gocoax-exporter`** (`crates/gocoax-exporter`) — a Prometheus exporter
   binary that polls the devices in your config and serves `/metrics`.
+- **`gocoax-remediator`** (`crates/gocoax-remediator`) — an optional daemon that
+  watches the exporter's metrics via Prometheus and automatically reboots stuck
+  adapters, gated by a per-device cooldown + daily circuit breaker and
+  `dry_run = true` by default. See [Automatic remediation](#automatic-remediation-optional)
+  below and [`docs/remediator.md`](docs/remediator.md).
 
 ## Build
 
@@ -24,6 +29,8 @@ Produces:
 
 - `target/release/gocoax` — the CLI
 - `target/release/gocoax-exporter` — the exporter
+- `target/release/gocoax-remediator` — the optional auto-reboot daemon
+  (see [Automatic remediation](#automatic-remediation-optional))
 
 ## Configure
 

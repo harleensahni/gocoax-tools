@@ -240,6 +240,146 @@ Configure it with the `[remediator]` block in `config.toml` (see
 > `dry_run = false`. A per-device **cooldown** and daily **circuit breaker**
 > apply in both modes. Start in dry-run, watch what it *would* do, then enable.
 
+## Writing custom remediation rules
+
+Each `[[remediator.rule]]` is just a PromQL expression. The engine has exactly
+one contract:
+
+> **A rule's query must return series carrying a `device` label whose value
+> equals a configured `[[device]].name`.** The poller reads that label off every
+> returned series and reboots the matching device (subject to `dry_run`, the
+> cooldown, and the circuit breaker). The rule's `name` becomes the `reason`
+> label on the reboot metrics. Series without a matching `device` are skipped
+> with a warning.
+
+Everything below is about satisfying that contract while keeping rules safe and
+expressive. The examples use placeholder names — adapters `moca-1`/`moca-2`/
+`moca-3`, and always-on anchors `router`/`nas` — substitute your own.
+
+### Guarding against network-wide outages
+
+A reboot rule should not fire when a *shared upstream* is down — during a router
+restart or firmware update your adapters look unreachable, but rebooting them is
+pointless (they're not the problem, and you can't even reach them to send the
+reboot). Gate each rule on the health of a **non-adapter anchor**: your router,
+a NAS — something always-on that proves the path is up. Two ways:
+
+**Approach 1 — an inline gate on each rule.** Append an `and on() (…)` clause
+naming your anchors:
+
+```toml
+expr = '''
+  ( <your trigger> )
+  and on() (max(probe_success{job="blackbox_ping",instance=~"(router|nas)"}) == 1)
+'''
+```
+
+`max(...)` means "at least one anchor up"; if every anchor is down the clause is
+empty and all reboots are suppressed. Prefer the **recovery-grace** form, which
+requires the network to have been *continuously* healthy for 10 minutes — so you
+don't reboot adapters during the settling period right after the network comes
+back:
+
+```promql
+and on() (min_over_time(max(probe_success{job="blackbox_ping",instance=~"(router|nas)"})[10m:]) == 1)
+```
+
+**Approach 2 — a Prometheus recording rule.** Compute "is the network healthy"
+once, reference it from every rule, and get a metric you can also alert on:
+
+```yaml
+# in your Prometheus rules file
+groups:
+  - name: gocoax_gates
+    rules:
+      - record: gocoax:network_healthy
+        expr: min_over_time(max(probe_success{instance=~"(router|nas)"})[10m:]) == bool 1
+```
+
+```toml
+# each remediator rule then just appends:
+expr = '( <your trigger> ) and on() (gocoax:network_healthy == 1)'
+```
+
+Notes:
+
+- Use **LAN-internal** anchors (router, NAS), **not** your ISP/modem — an
+  internet outage doesn't affect LAN adapter reachability, so it shouldn't freeze
+  remediation.
+- Pick anchors that are genuinely always-on; with two under `max()`, either one
+  being up keeps the gate open.
+- **Backstop without a named anchor** — suppress when *every* adapter is down at
+  once (almost always shared infrastructure, not N independent faults):
+  `unless on() (count(gocoax_up == 0) == count(gocoax_up))`.
+
+### Triggering on metrics other than the gocoax stats
+
+A rule can query *any* metric in Prometheus, not just `gocoax_*`. For example,
+reboot on sustained **ICMP packet loss** or high RTT measured by a
+blackbox-exporter ping job. This is often a *better* signal than the device's own
+counters because it measures end-to-end user impact — but remember a reboot only
+helps if the fault is something a reboot can actually clear (a physical coax
+problem won't be).
+
+Always gate a reachability-based trigger on `gocoax_up == 1` so you only reboot
+devices you can actually reach (a fully-unreachable device can't receive the
+reboot POST anyway):
+
+```promql
+and on(device) (gocoax_up == 1)
+```
+
+### Bridging identifiers
+
+Other jobs rarely use a `device` label. Translate whatever they use into
+`device`:
+
+**Case 1 — same value, different label name.** If the foreign label's *value*
+already equals your device name (e.g. a blackbox `instance="moca-1"`), copy it
+into `device` with `label_replace`:
+
+```promql
+label_replace( <expr with an instance label>, "device", "$1", "instance", "(.*)" )
+```
+
+**Case 2 — a different identifier (e.g. an IP).** Join through `gocoax_info`,
+which carries `device`, `ip`, and `mac` labels, as a translation table:
+
+```promql
+( <expr keyed by ip> ) * on(ip) group_left(device) gocoax_info
+```
+
+In both cases, filter the foreign selector to just your adapters
+(`instance=~"(moca-1|moca-2|…)"`) so unrelated targets (routers, other hosts)
+don't leak in — they'd be harmlessly skipped, but it's cleaner.
+
+### A complete example
+
+Reboot an adapter on **≥20% ICMP loss sustained over 15 minutes**, but only if
+it's reachable, only when the network is healthy, and not within 30 min of its
+last reboot:
+
+```toml
+[[remediator.rule]]
+name = "ping_loss"
+expr = '''
+  label_replace(
+    avg_over_time(
+      (1 - probe_success{job="blackbox_ping",instance=~"(moca-1|moca-2|moca-3)"})[15m:]
+    ) > 0.2,
+    "device", "$1", "instance", "(.*)"
+  )
+  and on(device) (gocoax_up == 1)
+  and on() (gocoax:network_healthy == 1)
+  unless on(device) ((time() - gocoax_remediator_last_reboot_timestamp_seconds) < 1800)
+'''
+```
+
+Reading it inside-out: measure loss per ping target → keep those over 20% →
+rename `instance`→`device` → keep only reachable adapters → suppress entirely if
+the network isn't healthy → suppress a device still inside its 30-min grace
+period.
+
 ## Metric catalog
 
 Common label: `device` (the config's `[[device]].name`). `gocoax_info` also

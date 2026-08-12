@@ -164,7 +164,21 @@ impl Client {
         let frame = self.read(ms::FRAME_INFO, ZERO_ARG_BODY).await?;
         let ip = self.read(ms::IP_ADDR, ZERO_ARG_BODY).await?;
         let lof = self.read(ms::LOF, ZERO_ARG_BODY).await?;
-        let eth = self.read(ms::ETH_INFO, ZERO_ARG_BODY).await?;
+        // ETH_INFO (per-port link/speed, register 0x307) was added in newer
+        // firmware; older adapters don't implement it and return 400. Read it
+        // best-effort: on any failure fall back to an empty payload so a
+        // firmware-drifted device still reports up with all its other data,
+        // and the per-port eth metrics are simply omitted (metrics::render
+        // already skips absent eth_ports). Propagating the error here would
+        // instead mark the whole device down -- and make the remediator try to
+        // reboot a healthy adapter over a feature its firmware simply lacks.
+        let eth = match self.read(ms::ETH_INFO, ZERO_ARG_BODY).await {
+            Ok(words) => words,
+            Err(e) => {
+                self.log(format_args!("ETH_INFO (0x307) read failed: {e}; omitting per-port eth metrics"));
+                Vec::new()
+            }
+        };
         DeviceStatus::decode(&local, &mac, &frame, &ip, &lof, &eth)
     }
 

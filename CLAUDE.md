@@ -131,6 +131,16 @@ headers or auth breaks completely.
   `EthCounters::decode`.
 - **`ethInfo` (`0x307`) per-port triples start at port index 1**, not 0 — the
   device UI itself skips port 0 on MXL371x. See `decode_eth_ports`.
+- **`ethInfo` (`0x307`) is read BEST-EFFORT** in `Client::device_status`: the
+  per-port link/speed feature was *added* in newer firmware (e.g. `1.18.15`);
+  older adapters don't implement `0x307` and return **400**. A failed `0x307`
+  read must NOT fail the whole status read — it falls back to empty `eth_ports`
+  so a firmware-drifted device still reports `gocoax_up=1` with all its other
+  data (the eth link/speed metrics are simply omitted; `metrics::render` already
+  skips absent `eth_ports`). Propagating it would mark a healthy adapter down and
+  make the remediator try to reboot it over a missing feature. Regression tests:
+  `device_status_ok_when_eth_info_returns_400` + `..._populates_eth_ports_when_0x307_ok`
+  in `tests/client_mock.rs`.
 - **Node MoCA version** is `netInfo[4] & 0xff`, e.g. `0x25` → "2.5",
   `0x20` → "2.0" (used both in `DeviceStatus::decode`'s own moca_version via
   `localInfo[11]` and per-node in `decode_net_nodes`/`phy_rates`).

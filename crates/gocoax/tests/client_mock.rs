@@ -93,6 +93,63 @@ async fn reboot_ok_when_device_drops_after_send() {
     assert!(client.reboot().await.is_ok(), "post-send timeout should be treated as reboot success");
 }
 
+// Mount the csrf cookie + the five *core* device_status registers (everything
+// except ETH_INFO/0x307), served from the real captured fixtures so they decode
+// cleanly. Each test then mounts its own 0x307 behavior on top.
+async fn mount_core_status_registers(server: &MockServer) {
+    Mock::given(method("GET")).and(path("/index.html"))
+        .respond_with(ResponseTemplate::new(200)
+            .insert_header("Set-Cookie", "csrf_token=X; SameSite=Strict"))
+        .mount(server).await;
+    for (p, body) in [
+        ("/ms/0/0x15", include_str!("fixtures/localInfo_0x15.json")),
+        ("/ms/1/0x103/GET", include_str!("fixtures/macInfo_0x103.json")),
+        ("/ms/0/0x14", include_str!("fixtures/frameInfo_0x14.json")),
+        ("/ms/1/0x20b/GET", include_str!("fixtures/ipAddr_0x20b.json")),
+        ("/ms/0/0x1003/GET", include_str!("fixtures/lof_0x1003.json")),
+    ] {
+        Mock::given(method("POST")).and(path(p))
+            .respond_with(ResponseTemplate::new(200).set_body_string(body))
+            .mount(server).await;
+    }
+}
+
+// ETH_INFO (0x307) was added in newer firmware; older adapters return 400 for
+// it. A best-effort read must let device_status() still SUCCEED (so the exporter
+// reports the device up, not down -> no pointless remediator reboot), with the
+// per-port eth info simply absent.
+#[tokio::test]
+async fn device_status_ok_when_eth_info_returns_400() {
+    let server = MockServer::start().await;
+    mount_core_status_registers(&server).await;
+    Mock::given(method("POST")).and(path("/ms/1/0x307/GET"))
+        .respond_with(ResponseTemplate::new(400)).mount(&server).await;
+
+    let host = server.uri().replace("http://", "");
+    let client = Client::new(&host, creds(), opts()).unwrap();
+    let st = client.device_status().await
+        .expect("device_status must still succeed when ETH_INFO returns 400");
+    assert!(st.eth_ports.is_empty(), "eth_ports must be empty when 0x307 fails");
+    assert!(!st.mac.is_empty(), "core fields still decode from the other registers");
+}
+
+// Guard the normal path: when 0x307 answers with data, per-port eth info is
+// populated as before (the best-effort change must not regress this).
+#[tokio::test]
+async fn device_status_populates_eth_ports_when_0x307_ok() {
+    let server = MockServer::start().await;
+    mount_core_status_registers(&server).await;
+    Mock::given(method("POST")).and(path("/ms/1/0x307/GET"))
+        .respond_with(ResponseTemplate::new(200)
+            .set_body_string(include_str!("fixtures/ethInfo_0x307.json")))
+        .mount(&server).await;
+
+    let host = server.uri().replace("http://", "");
+    let client = Client::new(&host, creds(), opts()).unwrap();
+    let st = client.device_status().await.expect("device_status should succeed");
+    assert!(!st.eth_ports.is_empty(), "eth_ports should be populated when 0x307 returns data");
+}
+
 // A genuine auth rejection on the reboot is still an error (the reboot did not happen).
 #[tokio::test]
 async fn reboot_err_on_auth_failure() {

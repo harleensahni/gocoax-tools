@@ -14,7 +14,7 @@ one container image.
 gocoax-tools/
   Cargo.toml                       # [workspace], shared deps (tokio, reqwest, axum, ...)
   config.example.toml              # template for config.toml (git-ignored)
-  grafana-dashboard.json           # importable Grafana dashboard (20 panels across 8 rows)
+  grafana-dashboard.json           # importable Grafana dashboard (21 panels across 8 rows)
   crates/
     gocoax/                        # core library + CLI bin
       src/

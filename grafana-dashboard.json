@@ -1396,6 +1396,72 @@
           "mode": "multi"
         }
       }
+    },
+    {
+      "id": 29,
+      "type": "timeseries",
+      "title": "Ethernet error rate ((bad+dropped) / total)",
+      "description": "Load-normalized link-quality signal: the fraction of Ethernet frames that were NOT good = (bad + dropped) / (good + bad + dropped). Unlike absolute drops/sec this is independent of throughput -- a marginal link reads high at any load, a busy-but-healthy link stays near 0. Counts BOTH corruption (bad) and congestion (dropped), and is bounded 0-100% with no divide-by-zero (an all-bad link reads 100%; only a fully idle link is NaN -> a harmless gap). Healthy adapters sit <1%; the remediation rule triggers on a sustained (15m) rate above ~2%.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 73
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum without(status)(rate(gocoax_ethernet_rx_frames_total{device=~\"$device\",status=~\"bad|dropped\"}[5m])) / sum without(status)(rate(gocoax_ethernet_rx_frames_total{device=~\"$device\",status=~\"good|bad|dropped\"}[5m]))",
+          "legendFormat": "{{device}} rx err-rate"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum without(status)(rate(gocoax_ethernet_tx_frames_total{device=~\"$device\",status=~\"bad|dropped\"}[5m])) / sum without(status)(rate(gocoax_ethernet_tx_frames_total{device=~\"$device\",status=~\"good|bad|dropped\"}[5m]))",
+          "legendFormat": "{{device}} tx err-rate"
+        }
+      ]
     }
   ]
 }
